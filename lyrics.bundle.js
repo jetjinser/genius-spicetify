@@ -32,6 +32,10 @@ function LyricApp(e, t, n) {
             initFunc: this.initMusixmatch,
             fetchFunc: this.fetchMusixmatch,
         },
+        Netease: {
+            initFunc: this.initNetease,
+            fetchFunc: this.fetchNetease,
+        },
     };
     this.container = e;
     this.lyricsSheet = null;
@@ -267,6 +271,95 @@ LyricApp.prototype.fetchMusixmatch = function(info) {
         }
     });
 };
+
+LyricApp.prototype.initNetease = function () {
+
+}
+
+LyricApp.prototype.fetchNetease = function (info) {
+    const url = `http://music.163.com/api/search/get/web?csrf_token=hlpretag=&hlposttag=&s=${info.title}&type=1&offset=0&total=true&limit=1`;
+    cosmosAPI.resolver.get(
+        {
+            url: url,
+            headers: {
+                "Host": "music.163.com",
+                "X-Real-IP": "bilibili.com",
+                "X-Forwarded-For": "bilibili.com",
+            }
+        }, (error, neteaseSearch) => {
+            if (error) {
+                console.error(error);
+                this._handleFetchLyrics({}, info);
+                return;
+            }
+            const body = neteaseSearch.getJSONBody().result.songs[0];
+            const l_url = `https://music.163.com/api/song/lyric?id=${body.id}&lv=1&kv=1&tv=-1`
+            cosmosAPI.resolver.get(
+                {
+                    url: l_url,
+                }, (error, neteaseLyric) => {
+                    if (error) {
+                        console.error(error);
+                        this._handleFetchLyrics({}, info);
+                        return;
+                    }
+                    const lrc = neteaseLyric.getJSONBody();
+                    const lyric = lrc.lrc.lyric;
+                    const lyric_zh = lrc.tlyric.lyric;
+                    if (lyric == undefined || lyric_zh == undefined) {
+                        this._handleFetchLyrics({}, info)
+                        return
+                    }
+
+                    const regex = /\[([0-9:.]+)\](.+)/;
+
+                    var lines = lyric
+                        .split(/[\r\n]+/)
+                        .filter(line => line != "")
+                        .map( line => {
+                            const res = regex.exec(line);
+                            if (res == null) { return }
+                            return (
+                                {
+                                    "text": res[2].trim(),
+                                    "time": res[1].split(":").reduce(
+                                        (min, sec) => { return Number(min * 60000 + sec * 1000)
+                                    })
+                        })
+                    })
+
+                    if (lyric_zh != undefined) {
+                        const lines_zh = lyric_zh
+                            .split(/[\r\n]+/)
+                            .filter(line => line != "")
+                            .map( line => {
+                                const res = regex.exec(line);
+                                if (res == null) { return }
+                                return (
+                                    {
+                                        "text": res[2].trim(),
+                                        "time": res[1].split(":").reduce(
+                                            (min, sec) => { return Number(min * 60000 + sec * 1000)
+                                        })
+                                })
+                            })
+                            .filter(line => line != undefined)
+                        lines_zh.forEach(map => {
+                            const row = lines.find(line => line.time == map.time)
+                            if (row == undefined) {
+                                return
+                            }
+                            row.text += `\n${map.text}`
+                        })
+                    }
+
+                    // console.log(lines)
+                    this._handleFetchLyrics({ lines }, info);
+                }
+            )
+        }
+    )
+}
 
 LyricApp.prototype.init = function (e) {
     this.options = "object" == typeof e ? e : {};

@@ -4,7 +4,7 @@
   },
   "BundleIdentifier": "genius",
   "BundleType": "Application",
-  "BundleVersion": "1.1.22",
+  "BundleVersion": "1.2.0",
   "VendorIdentifier": "com.spotify",
   "AppName": "Genius",
   "SupportedLanguages": [
